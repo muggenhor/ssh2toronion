@@ -47,6 +47,10 @@ install: build
 	dh_installdirs
 #
 	$(MAKE) install DESTDIR=$(CURDIR)/debian/ssh2toronion
+	# The GPLv3 can already be found in /usr/share/common-licenses/GPL-3
+	# (pkg base-files), so don't include it in the package
+	rm -f $(CURDIR)/debian/ssh2toronion/usr/share/doc/ssh2toronion/COPYING
+	rm -f $(CURDIR)/debian/ssh2toronion/usr/share/doc/ssh2toronion/COPYING.gz
 #
 	dh_strip -a --dbg-package=ssh2toronion-dbg
 

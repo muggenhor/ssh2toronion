@@ -1,4 +1,12 @@
 Proxy to route SSH onion connections through Tor
+
+SSH2TorOnion automatically fetches the host key for the target *.onion address,
+and if its SHA-1 hash matches the onion address adds it to the user's
+~/.ssh/known_hosts file. If a host key already exists it immediately continues
+by providing a proxy between the SSH client and Tor (i.e. it routes the
+connection through Tor).
+
+
 Copyright (C) 2011  Giel van Schijndel
 
 This program is free software: you can redistribute it and/or modify
