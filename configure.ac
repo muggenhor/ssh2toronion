@@ -3,6 +3,7 @@ AC_INIT([ssh2toronion], [0.1])
 
 AM_INIT_AUTOMAKE([1.10])
 
+AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR([src/ssh2toronion.c])
 
 
@@ -62,6 +63,7 @@ ST_CXXFLAGS="${ST_CXXFLAGS} ${DEBUGFLAGS}"
 # Checks for libraries:
 PKG_CHECK_MODULES([SSL_CRYPTO], [libcrypto])
 PKG_CHECK_MODULES([SSH2], [libssh2])
+gl_FUNC_GETOPT_POSIX
 
 AC_SUBST([ST_CPPFLAGS], [${ST_CPPFLAGS}])
 AC_SUBST([ST_CFLAGS], [${ST_CFLAGS}])

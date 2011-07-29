@@ -97,12 +97,12 @@ static ssize_t readall(const int fd, void* buf, size_t len)
 	return cnt;
 }
 
-static int socks_connect(const char* const hostname, const int port)
+static int socks_connect(const in_addr_t proxy_host, const unsigned int proxy_port, const char* const hostname, const int port)
 {
 	const struct sockaddr_in tor_addr = {
 		.sin_family = AF_INET,
-		.sin_port = htons(9050),
-		.sin_addr.s_addr = htonl(INADDR_LOOPBACK),
+		.sin_port = proxy_port,
+		.sin_addr.s_addr = proxy_host,
 	};
 	const int sock = socket(AF_INET, SOCK_STREAM, 0);
 	if (sock == -1)
@@ -113,7 +113,7 @@ static int socks_connect(const char* const hostname, const int port)
 
 	if (connect(sock, (const struct sockaddr*)&tor_addr, sizeof(tor_addr)) == -1)
 	{
-		perror("connect(127.0.0.1:9050)");
+		fprintf(stderr, "connect(%s:%d): %s\n", inet_ntoa(*(struct in_addr*)&proxy_host), ntohs(proxy_port), strerror(errno));
 		exit(EX_IOERR);
 	}
 
@@ -121,7 +121,7 @@ static int socks_connect(const char* const hostname, const int port)
 	struct socks4_connect_op* const socks4_connect_op = malloc(cmd_len);
 	socks4_connect_op->version = 4;
 	socks4_connect_op->command = SOCKS_OP_CONNECT;
-	socks4_connect_op->dstport = htons(port);
+	socks4_connect_op->dstport = port;
 	socks4_connect_op->dstip   = htonl(1);
 	socks4_connect_op->userid_host[0] = '\0';
 	strcpy(&socks4_connect_op->userid_host[1], hostname);
@@ -162,9 +162,9 @@ static int socks_connect(const char* const hostname, const int port)
 	}
 }
 
-static int tunnel(const char* const hostname, const int port)
+static int tunnel(const in_addr_t proxy_host, const unsigned int proxy_port, const char* const hostname, const int port)
 {
-	const int sock = socks_connect(hostname, port);
+	const int sock = socks_connect(proxy_host, proxy_port, hostname, port);
 
 	bool stdin_open   = true,
 	     stdout_open  = true,
@@ -334,9 +334,73 @@ static int tunnel(const char* const hostname, const int port)
 	return EX_OK;
 }
 
+static int usage(void)
+{
+	fputs("Usage: ssh2toronion [-h proxy-ipv4] [-p proxy-port] host [port=22]\n", stderr);
+	return EX_DATAERR;
+}
+
 int main(int argc, char** argv)
 {
 	int ret;
+
+	in_addr_t    proxy_host = htonl(INADDR_LOOPBACK);
+	unsigned int proxy_port = htons(9050);
+	const char*  dsthost = NULL;
+	unsigned int dstport = htons(22);
+
+	while ((ret = getopt(argc, argv, "h:p:")) != -1)
+	{
+		switch (ret)
+		{
+			case 'h':
+			{
+				proxy_host = inet_addr(optarg);
+				if (proxy_host == INADDR_NONE)
+				{
+					fprintf(stderr, "invalid IPv4 address to reach SOCKS proxy at: '%s'\n", optarg);
+					return usage();
+				}
+				break;
+			}
+			case 'p':
+			{
+				char* portend;
+				proxy_port = htons(strtoul(optarg, &portend, 10));
+				if (!optarg || *optarg == '\0' || *portend != '\0'
+				 || proxy_port < 1 || proxy_port > 65535)
+				{
+					fprintf(stderr, "invalid proxy port number (expected a number between 1 and 65535, inclusive): '%s'\n", optarg);
+					return usage();
+				}
+				break;
+			}
+			case '?':
+			default:
+				return usage();
+		}
+	}
+
+	if (argc - optind < 1
+	 || argc - optind > 2)
+		return usage();
+
+	// Hostname
+	dsthost = argv[optind++];
+
+	// Port number (defaulting to 22)
+	if (optind < argc)
+	{
+		optarg = argv[optind];
+		char* portend;
+		dstport = htons(strtoul(optarg, &portend, 10));
+		if (!optarg || *optarg == '\0' || *portend != '\0'
+		 || dstport < 1 || dstport > 65535)
+		{
+			fprintf(stderr, "invalid target port number (expected a number between 1 and 65535, inclusive): '%s'\n", optarg);
+			return EX_DATAERR;
+		}
+	}
 
 	ret = libssh2_init(0);
 	if (ret != LIBSSH2_ERROR_NONE)
@@ -366,37 +430,24 @@ int main(int argc, char** argv)
 		return EX_DATAERR;
 	}
 
-	const char* const dsthost = argv[1];
-	char* portend;
-	int dstport = 22;
-	if (argc >= 3)
-	{
-		dstport = strtoul(argv[2], &portend, 10);
-		if (*argv[2] == '\0' || *portend != '\0')
-		{
-			fprintf(stderr, "invalid number as second parameter (target port number): '%s'\n", argv[2]);
-			return EX_DATAERR;
-		}
-	}
-
 	// Check if there's already an RSA key for the given host present
 	struct libssh2_knownhost* cur_host = NULL;
 	while (!libssh2_knownhost_get(known_hosts, &cur_host, cur_host))
 	{
 		if (cur_host->typemask & LIBSSH2_KNOWNHOST_KEY_SSHRSA
 		 && cur_host->name
-		 && strcmp(cur_host->name, argv[1]) == 0)
+		 && strcmp(cur_host->name, dsthost) == 0)
 		{
 			libssh2_knownhost_free(known_hosts);
 			libssh2_session_free(session);
 			libssh2_exit();
 			free(known_hosts_path);
-			return tunnel(dsthost, dstport);
+			return tunnel(proxy_host, proxy_port, dsthost, dstport);
 		}
 	}
 	libssh2_knownhost_free(known_hosts);
 
-	const int sock = socks_connect(dsthost, dstport);
+	const int sock = socks_connect(proxy_host, proxy_port, dsthost, dstport);
 	libssh2_banner_set(session, "SSH-2.0-ssh2onion_address_0.1");
 	ret = libssh2_session_startup(session, sock);
 	if (ret != LIBSSH2_ERROR_NONE)
@@ -530,5 +581,5 @@ int main(int argc, char** argv)
 	fclose(f);
 	free(known_hosts_path);
 
-	return tunnel(dsthost, dstport);
+	return tunnel(proxy_host, proxy_port, dsthost, dstport);
 }
