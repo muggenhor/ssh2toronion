@@ -66,7 +66,7 @@ static void writeall(const int fd, const void* buf, size_t len)
 			exit(EX_IOERR);
 		}
 
-		buf += ret;
+		buf = (const char*)buf + ret;
 		len -= ret;
 	}
 }
@@ -89,7 +89,7 @@ static ssize_t readall(const int fd, void* buf, size_t len)
 		if (ret == 0)
 			return cnt;
 
-		buf += ret;
+		buf = (char*)buf + ret;
 		len -= ret;
 		cnt += ret;
 	}
@@ -430,7 +430,7 @@ int main(int argc, char** argv)
 		return EX_DATAERR;
 	}
 
-	void* keyp = keybuf;
+	char* keyp = keybuf;
 	size_t left = size;
 
 	len = ntohl(*(const uint32_t*)keyp);
@@ -442,8 +442,8 @@ int main(int argc, char** argv)
 		return EX_DATAERR;
 	} else if (strncmp("ssh-rsa", (const char*)keyp, len))
 	{
-		((char*)keyp)[len] = '\0';
-		fprintf(stderr, "unknown key-format (expected \"ssh-rsa\"): \"%s\"\n", (const char*)keyp);
+		keyp[len] = '\0';
+		fprintf(stderr, "unknown key-format (expected \"ssh-rsa\"): \"%s\"\n", keyp);
 		return EX_DATAERR;
 	}
 	left -= len;
