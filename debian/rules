@@ -1,0 +1,88 @@
+#!/usr/bin/make -f
+# GNU copyright 1997 to 1999 by Joey Hess.
+# Copyright (c) 1999 Herbert Xu <herbert@debian.org>
+
+# Uncomment this to turn on verbose mode. 
+#export DH_VERBOSE=1
+
+# This has to be exported to make some magic below work.
+export DH_OPTIONS
+
+# This is used to make sure that we only put autoconf in cross-compiling mode
+# when the host-type (i.e. the platform on which the resulting binary will
+# run), differs from the build-type (i.e. the platform on which the binary will
+# be compiled.
+ifeq ($(DEB_BUILD_GNU_TYPE),$(DEB_HOST_GNU_TYPE))
+  CONFFLAGS += --build=$(DEB_BUILD_GNU_TYPE)
+else
+  CONFFLAGS += --build=$(DEB_BUILD_GNU_TYPE) --host=$(DEB_HOST_GNU_TYPE)
+endif
+
+configure: configure.ac autogen.sh
+	sh autogen.sh
+
+config.status: configure
+	dh_testdir
+	./configure $(CONFFLAGS) --prefix=/usr --disable-debug
+
+build: build-stamp
+build-stamp: config.status
+	dh_testdir
+	$(MAKE)
+	touch $@
+
+clean:
+	dh_testdir
+	dh_testroot
+	$(RM) build-stamp
+#
+	-$(MAKE) distclean
+	dh_clean
+
+install: DH_OPTIONS=
+install: build
+	dh_testdir
+	dh_testroot
+	dh_prep
+	dh_installdirs
+#
+	$(MAKE) install DESTDIR=$(CURDIR)/debian/ssh2toronion
+#
+	dh_strip -a --dbg-package=ssh2toronion-dbg
+
+# This single target is used to build all the packages, all at once, or
+# one at a time. So keep in mind: any options passed to commands here will
+# affect _all_ packages. Anything you want to only affect one package
+# should be put in another target, such as the install target.
+binary-common:
+	dh_testdir
+	dh_testroot
+	dh_installdocs
+	dh_installexamples
+	dh_installmenu
+	dh_installcron
+	dh_installinfo
+	dh_link
+	dh_compress
+	dh_fixperms
+	dh_installdeb
+	dh_shlibdeps
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
+# Build architecture independant packages using the common target.
+binary-indep: install
+# (Uncomment this next line if you have such packages.)
+#	 $(MAKE) -f debian/rules DH_OPTIONS=-i binary-common
+
+# Build architecture dependant packages using the common target.
+binary-arch: install
+	$(MAKE) -f debian/rules DH_OPTIONS=-a binary-common
+
+# Any other binary targets build just one binary package at a time.
+binary-%: build install
+	make -f debian/rules binary-common DH_OPTIONS=-p$*
+
+binary: binary-indep binary-arch
+.PHONY: build clean binary-indep binary-arch binary install

@@ -1,0 +1,23 @@
+Source: ssh2toronion
+Section: admin
+Priority: optional
+Maintainer: Giel van Schijndel <me@mortis.eu>
+Standards-Version: 3.8.3.0
+Build-Depends: autoconf, automake, debhelper (>= 7), libssh2-1-dev, libssl-dev
+
+Package: ssh2toronion
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Proxy to route SSH onion connections through Tor
+ SSH2TorOnion automatically fetches the host key for the target *.onion
+ address, and if its SHA-1 hash matches the onion address adds it to the
+ user's ~/.ssh/known_hosts file. If a host key already exists it immediately
+ continues by providing a proxy between the SSH client and Tor (i.e. it
+ routes the connection through Tor).
+
+Package: ssh2toronion-dbg
+Architecture: any
+Priority: extra
+Depends: ${misc:Depends}, ssh2toronion (= ${binary:Version})
+Description: debug files for ssh2toronion
+ This package contains debug information for the ssh2toronion package.
