@@ -2,6 +2,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <libssh2.h>
+#include <netdb.h>
 #include <netinet/in.h>
 #include <openssl/bio.h>
 #include <openssl/bn.h>
@@ -336,7 +337,7 @@ static int tunnel(const in_addr_t proxy_host, const unsigned int proxy_port, con
 
 static int usage(void)
 {
-	fputs("Usage: ssh2toronion [-h proxy-ipv4] [-p proxy-port] host [port=22]\n", stderr);
+	fputs("Usage: ssh2toronion [-h proxy-ipv4] [-p proxy-port] host [port|service=22]\n", stderr);
 	return EX_DATAERR;
 }
 
@@ -394,8 +395,14 @@ int main(int argc, char** argv)
 		optarg = argv[optind];
 		char* portend;
 		dstport = htons(strtoul(optarg, &portend, 10));
-		if (!optarg || *optarg == '\0' || *portend != '\0'
-		 || dstport < 1 || dstport > 65535)
+		if (!optarg || *optarg == '\0' || *portend != '\0')
+		{
+			dstport = 0;
+			const struct servent* const service = getservbyname(optarg, "tcp");
+			if (service != NULL)
+				dstport = service->s_port;
+		}
+		if (dstport < 1 || dstport > 65535)
 		{
 			fprintf(stderr, "invalid target port number (expected a number between 1 and 65535, inclusive): '%s'\n", optarg);
 			return EX_DATAERR;
