@@ -564,29 +564,34 @@ int main(int argc, char** argv)
 	base32_encode(onion, 16 + 1, (const char*)digest, 10);
 	strcat(onion, tld);
 
-	static const char comment[] = "Tor Key";
-	char knownhost_line[2048];
-	known_hosts = libssh2_knownhost_init(session);
-	if (libssh2_knownhost_addc(known_hosts, onion, "", keybuf, size, comment, strlen(comment), LIBSSH2_KNOWNHOST_TYPE_PLAIN|LIBSSH2_KNOWNHOST_KEYENC_RAW|LIBSSH2_KNOWNHOST_KEY_SSHRSA, NULL) != LIBSSH2_ERROR_NONE
-	 || libssh2_knownhost_get(known_hosts, &cur_host, NULL) != LIBSSH2_ERROR_NONE
-	 || libssh2_knownhost_writeline(known_hosts, cur_host, knownhost_line, sizeof(knownhost_line), &size, LIBSSH2_KNOWNHOST_FILE_OPENSSH) != LIBSSH2_ERROR_NONE)
+	// Only add new key if it's for the current host
+	if (strcmp(dsthost, onion) == 0)
 	{
-		fputs("Failed to get encoded known-hosts line\n", stderr);
-		return EX_SOFTWARE;
-	}
-	libssh2_knownhost_free(known_hosts);
-	libssh2_session_free(session);
-	libssh2_exit();
-	free(keybuf);
+		static const char comment[] = "Tor Key";
+		char knownhost_line[2048];
+		known_hosts = libssh2_knownhost_init(session);
+		if (libssh2_knownhost_addc(known_hosts, onion, "", keybuf, size, comment, strlen(comment), LIBSSH2_KNOWNHOST_TYPE_PLAIN|LIBSSH2_KNOWNHOST_KEYENC_RAW|LIBSSH2_KNOWNHOST_KEY_SSHRSA, NULL) != LIBSSH2_ERROR_NONE
+		 || libssh2_knownhost_get(known_hosts, &cur_host, NULL) != LIBSSH2_ERROR_NONE
+		 || libssh2_knownhost_writeline(known_hosts, cur_host, knownhost_line, sizeof(knownhost_line), &size, LIBSSH2_KNOWNHOST_FILE_OPENSSH) != LIBSSH2_ERROR_NONE)
+		{
+			fputs("Failed to get encoded known-hosts line\n", stderr);
+			return EX_SOFTWARE;
+		}
+		libssh2_knownhost_free(known_hosts);
+		libssh2_session_free(session);
+		libssh2_exit();
 
-	FILE* const f = fopen(known_hosts_path, "a");
-	if (!f)
-	{
-		perror("fopen(~/.ssh/known_hosts");
-		return EX_CANTCREAT;
+		FILE* const f = fopen(known_hosts_path, "a");
+		if (!f)
+		{
+			perror("fopen(~/.ssh/known_hosts");
+			return EX_CANTCREAT;
+		}
+		fwrite(knownhost_line, size, 1, f);
+		fclose(f);
 	}
-	fwrite(knownhost_line, size, 1, f);
-	fclose(f);
+
+	free(keybuf);
 	free(known_hosts_path);
 
 	return tunnel(proxy_host, proxy_port, dsthost, dstport);
