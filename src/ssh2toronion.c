@@ -394,7 +394,7 @@ int main(int argc, char** argv)
 	{
 		optarg = argv[optind];
 		char* portend;
-		dstport = htons(strtoul(optarg, &portend, 10));
+		dstport = strtoul(optarg, &portend, 10);
 		if (!optarg || *optarg == '\0' || *portend != '\0')
 		{
 			dstport = 0;
@@ -407,6 +407,7 @@ int main(int argc, char** argv)
 			fprintf(stderr, "invalid target port number (expected a number between 1 and 65535, inclusive): '%s'\n", optarg);
 			return EX_DATAERR;
 		}
+		dstport = htons(dstport);
 	}
 
 	ret = libssh2_init(0);
