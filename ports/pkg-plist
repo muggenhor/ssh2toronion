@@ -1,0 +1,4 @@
+bin/ssh2toronion
+%%PORTDOCS%%%%DOCSDIR%%/COPYING
+%%PORTDOCS%%%%DOCSDIR%%/README
+%%PORTDOCS%%@dirrmtry %%DOCSDIR%%

@@ -1,8 +1,10 @@
 *.[oa]
 .deps
+/Makefile
 /aclocal.m4
 /autom4te.cache
 /build-stamp
+/compile
 /config.guess
 /config.h
 /config.h.in
@@ -13,6 +15,6 @@
 /depcomp
 /install-sh
 /missing
+/src/Makefile
 /stamp-h1
-Makefile
 Makefile.in
